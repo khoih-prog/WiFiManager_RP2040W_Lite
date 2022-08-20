@@ -9,11 +9,11 @@
   Built by Khoi Hoang https://github.com/khoih-prog/WiFiManager_RP2040W_Lite
   Licensed under MIT license
   
-  Version: 1.0.0
+  Version: 1.6.0
 
   Version Modified By   Date        Comments
   ------- -----------  ----------   -----------
-  1.0.0   K Hoang      11/09/2021  Add support to RP2040W using arduino-pico core
+  1.6.0   K Hoang      11/09/2021  Add support to RP2040W using arduino-pico core v2.4.0+
  ********************************************************************************************************************************/
 
 #ifndef WiFiManager_RP2040W_Lite_h
@@ -26,23 +26,35 @@
 #endif
 
 #ifndef WIFI_MANAGER_RP2040W_LITE_VERSION
-  #define WIFI_MANAGER_RP2040W_LITE_VERSION             "WiFiManager_RP2040W_Lite v1.0.0"
+  #define WIFI_MANAGER_RP2040W_LITE_VERSION             "WiFiManager_RP2040W_Lite v1.6.0"
   
   #define WIFI_MANAGER_RP2040W_LITE_VERSION_MAJOR       1
-  #define WIFI_MANAGER_RP2040W_LITE_VERSION_MINOR       0
+  #define WIFI_MANAGER_RP2040W_LITE_VERSION_MINOR       6
   #define WIFI_MANAGER_RP2040W_LITE_VERSION_PATCH       0
 
-  #define WIFI_MANAGER_RP2040W_LITE_VERSION_INT         1000000
+  #define WIFI_MANAGER_RP2040W_LITE_VERSION_INT         1006000
 #endif
+
+#include <Arduino.h>
+
+#include <WiFiManager_RP2040W_Lite_Debug.h>
 
 #include <WiFiMulti_Generic.h>
 #include <WiFiWebServer.h>
 
 WiFiMulti_Generic wifiMulti;
 
+//Use LittleFS for RPI Pico
+#include <FS.h>
+#include <LittleFS.h>
+
+#define FileFS        LittleFS
+
 //////////////////////////////////////////
 
-#warning Using LittleFS in WiFiManager_RP2040W_Lite.h
+#if (_WIFI_GENERIC_LOGLEVEL_ > 3)
+  #warning Using LittleFS in WiFiManager_RP2040W_Lite.h
+#endif
 
 //////////////////////////////////////////
 
@@ -122,7 +134,11 @@ typedef struct
 //
 
 #if USE_DYNAMIC_PARAMETERS
-  #warning Using Dynamic Parameters
+
+	#if (_WIFI_GENERIC_LOGLEVEL_ > 3)
+		#warning Using Dynamic Parameters
+	#endif
+  
   ///NEW
   extern uint16_t NUM_MENU_ITEMS;
   extern MenuItem myMenuItems [];
@@ -246,15 +262,15 @@ String IPAddressToString(const IPAddress& _address)
 
 class WiFiManager_RP2040W_Lite
 {
-    public:
-    
+  public:
+
     WiFiManager_RP2040W_Lite()
-    {     
+    {
       // check for the presence of the shield
       if (WiFi.status() == WL_NO_SHIELD)
       {
-        WG_LOGERROR(F("NoWiFi"));
-      }     
+        WG_LOGERROR("NoWiFi");
+      }
     }
 
     ~WiFiManager_RP2040W_Lite()
@@ -271,46 +287,46 @@ class WiFiManager_RP2040W_Lite
 #endif
       }
     }
-        
+
     bool connectWiFi(const char* ssid, const char* pass)
     {
-      WG_LOGERROR1(F("Con2:"), ssid);
-      
+      WG_LOGERROR1("Con2:", ssid);
+
       setHostname();
 
-      if ( WiFi.begin(ssid, pass) == WL_CONNECTED )  
+      if ( WiFi.begin(ssid, pass) == WL_CONNECTED )
       {
         displayWiFiData();
       }
       else
       {
-        WG_LOGERROR(F("NoW"));
+        WG_LOGERROR("NoW");
         return false;
       }
 
-      WG_LOGERROR(F("WOK"));
+      WG_LOGERROR("WOK");
 
       wifi_connected = true;
 
       return true;
     }
-   
+
     void begin(const char* ssid,
                const char* pass )
     {
-      WG_LOGERROR(F("conW"));
+      WG_LOGERROR("conW");
       connectWiFi(ssid, pass);
     }
 
     void begin(const char *iHostname = "")
     {
-      #define RETRY_TIMES_CONNECT_WIFI			3
-      
+#define RETRY_TIMES_CONNECT_WIFI      3
+
       if (iHostname[0] == 0)
       {
         String randomNum = String(random(0xFFFFFF), HEX);
         randomNum.toUpperCase();
-        
+
         String _hostname = "RP2040W-H7-WIFI-" + randomNum;
         _hostname.toUpperCase();
 
@@ -321,69 +337,69 @@ class WiFiManager_RP2040W_Lite
         // Prepare and store the hostname only not NULL
         getRFC952_hostname(iHostname);
       }
-      
-       WG_LOGERROR1(F("Hostname="), RFC952_hostname);
+
+      WG_LOGERROR1("Hostname=", RFC952_hostname);
       //////
-      
+
       //// New DRD ////
-      drd = new DoubleResetDetector_Generic(DRD_TIMEOUT, DRD_ADDRESS);  
+      drd = new DoubleResetDetector_Generic(DRD_TIMEOUT, DRD_ADDRESS);
       bool noConfigPortal = true;
-   
+
       if (drd->detectDoubleReset())
       {
-        WG_LOGERROR(F("Double Reset Detected"));
-     
+        WG_LOGERROR("Double Reset Detected");
+
         noConfigPortal = false;
       }
       //// New DRD ////
-      
+
       if (LOAD_DEFAULT_CONFIG_DATA)
       {
-        WG_LOGERROR(F("======= Start Default Config Data ======="));
+        WG_LOGERROR("======= Start Default Config Data =======");
         displayConfigData(defaultConfig);
       }
-      
+
       hadConfigData = getConfigData();
-      
+
       isForcedConfigPortal = isForcedCP();
-        
+
       //// New DRD/MRD ////
       //  noConfigPortal when getConfigData() OK and no MRD/DRD'ed
       if (hadConfigData && noConfigPortal && (!isForcedConfigPortal) )
       {
         hadConfigData = true;
-        
+
         wifiMulti_addAP();
 
         if (connectMultiWiFi(RETRY_TIMES_CONNECT_WIFI))
         {
-          WG_LOGERROR(F("b:WOK"));
+          WG_LOGERROR("b:WOK");
         }
         else
         {
-          WG_LOGERROR(F("b:NoW"));
+          WG_LOGERROR("b:NoW");
           // failed to connect to WiFi, will start configuration mode
           startConfigurationMode();
         }
       }
       else
-      {      
-        WG_LOGERROR(isForcedConfigPortal? F("bg: isForcedConfigPortal = true") : F("bg: isForcedConfigPortal = false"));
-                     
+      {
+        WG_LOGERROR(isForcedConfigPortal ? "bg: isForcedConfigPortal = true" : "bg: isForcedConfigPortal = false");
+
         // If not persistent => clear the flag so that after reset. no more CP, even CP not entered and saved
         if (persForcedConfigPortal)
         {
-          WG_LOGERROR1(F("bg:Stay forever in CP:"), isForcedConfigPortal ? F("Forced-Persistent") : (noConfigPortal ? F("No ConfigDat") : F("DRD/MRD")));
+          WG_LOGERROR1("bg:Stay forever in CP:", isForcedConfigPortal ? "Forced-Persistent" : (noConfigPortal ? "No ConfigDat" : "DRD/MRD"));
         }
         else
         {
-          WG_LOGERROR1(F("bg:Stay forever in CP:"), isForcedConfigPortal ? F("Forced-non-Persistent") : (noConfigPortal ? F("No ConfigDat") : F("DRD/MRD")));
+          WG_LOGERROR1("bg:Stay forever in CP:", isForcedConfigPortal ? "Forced-non-Persistent" : (noConfigPortal ? "No ConfigDat" : "DRD/MRD"));
           clearForcedCP();
         }
-          
-        //To permit autoreset after timeout if DRD/MRD or non-persistent forced-CP 
+
+        //To permit autoreset after timeout if DRD/MRD or non-persistent forced-CP
         hadConfigData = isForcedConfigPortal ? true : (noConfigPortal ? false : true);
-        
+
         // failed to connect to WiFi, will start configuration mode
         startConfigurationMode();
       }
@@ -424,7 +440,7 @@ class WiFiManager_RP2040W_Lite
 #endif
 
 
-#if !defined(WIFI_RECON_INTERVAL)      
+#if !defined(WIFI_RECON_INTERVAL)
   #define WIFI_RECON_INTERVAL       0         // default 0s between reconnecting WiFi
 #else
   #if (WIFI_RECON_INTERVAL < 0)
@@ -438,17 +454,17 @@ class WiFiManager_RP2040W_Lite
     {
       static int retryTimes = 0;
       static bool wifiDisconnectedOnce = false;
-      
+
       // Lost connection in running. Give chance to reconfig.
       // Check WiFi status every 5s and update status
       // Check twice to be sure wifi disconnected is real
       static unsigned long checkstatus_timeout = 0;
-      #define WIFI_STATUS_CHECK_INTERVAL    5000L
-      
+#define WIFI_STATUS_CHECK_INTERVAL    5000L
+
       static uint32_t curMillis;
-      
+
       curMillis = millis();
-      
+
       //// New DRD ////
       // Call the double reset detector loop method every so often,
       // so that it can recognise when the timeout expires.
@@ -456,9 +472,9 @@ class WiFiManager_RP2040W_Lite
       // consider the next reset as a double reset.
       drd->loop();
       //// New DRD ////
-         
+
       if ( !configuration_mode && (curMillis > checkstatus_timeout) )
-      {       
+      {
         if ( WiFiConnected() )
         {
           wifi_connected = true;
@@ -469,16 +485,16 @@ class WiFiManager_RP2040W_Lite
           {
             wifiDisconnectedOnce = false;
             wifi_connected = false;
-            WG_LOGERROR(F("r:Check&WLost"));
+            WG_LOGERROR("r:Check&WLost");
           }
           else
           {
             wifiDisconnectedOnce = true;
           }
         }
-        
+
         checkstatus_timeout = curMillis + WIFI_STATUS_CHECK_INTERVAL;
-      }    
+      }
 
       // Lost connection in running. Give chance to reconfig.
       if ( !wifi_connected )
@@ -491,10 +507,10 @@ class WiFiManager_RP2040W_Lite
 
           if (server)
           {
-            //WG_LOGDEBUG(F("r:handleClient"));
+            //WG_LOGDEBUG("r:handleClient");
             server->handleClient();
           }
-           
+
           return;
         }
         else
@@ -506,7 +522,7 @@ class WiFiManager_RP2040W_Lite
           {
             if (++retryTimes <= CONFIG_TIMEOUT_RETRYTIMES_BEFORE_RESET)
             {
-              WG_LOGERROR1(F("r:WLost&TOut.ConW.Retry#"), retryTimes);
+              WG_LOGERROR1("r:WLost&TOut.ConW.Retry#", retryTimes);
             }
             else
             {
@@ -518,73 +534,59 @@ class WiFiManager_RP2040W_Lite
           // Not in config mode, try reconnecting before forcing to config mode
           if ( !wifi_connected )
           {
-            
- 
 #if (WIFI_RECON_INTERVAL > 0)
 
             static uint32_t lastMillis = 0;
-            
+
             if ( (lastMillis == 0) || (curMillis - lastMillis) > WIFI_RECON_INTERVAL )
             {
               lastMillis = curMillis;
-              
-              WG_LOGERROR(F("r:WLost.ReconW"));
-               
+
+              WG_LOGERROR("r:WLost.ReconW");
+
               if (connectMultiWiFi(RETRY_TIMES_RECONNECT_WIFI))
               {
-                WG_LOGERROR(F("r:WOK"));
+                WG_LOGERROR("r:WOK");
               }
             }
 #else
-            WG_LOGERROR(F("r:WLost.ReconW"));
-            
+            WG_LOGERROR("r:WLost.ReconW");
+
             if (connectMultiWiFi(RETRY_TIMES_RECONNECT_WIFI))
             {
-              WG_LOGERROR(F("r:WOK"));
+              WG_LOGERROR("r:WOK");
             }
-#endif            
+#endif
           }
         }
       }
       else if (configuration_mode)
       {
         configuration_mode = false;
-        WG_LOGERROR(F("r:gotWBack"));
+        WG_LOGERROR("r:gotWBack");
       }
     }
-       
+
     //////////////////////////////////////////////
-    
+
     void setHostname()
     {
       if (RFC952_hostname[0] != 0)
       {
-#if USE_WIFI101
-        WiFi.hostname(RFC952_hostname);
-#elif USE_WIFI_NINA    
         WiFi.setHostname(RFC952_hostname);
-#endif        
       }
     }
-    
+
     //////////////////////////////////////////////
 
-		// Very bad that the core now can't permit to change AP IP address via function
-		// Have to change via #define
-		// #define DEFAULT_IP_ADDRESS "192.168.3.1"
-		// This function is obsolete from core v2.7.2
+    // Very bad that the core now can't permit to change AP IP address via function
+    // Have to change via #define
+#define DEFAULT_IP_ADDRESS    "192.168.42.1"
 
-#if 0		
-    void setConfigPortalIP(const IPAddress& portalIP = IPAddress(192, 168, 3, 1))
-    {
-      portal_apIP = portalIP;
-    }
-#endif
-    
     //////////////////////////////////////////////
 
-    #define MIN_WIFI_CHANNEL      1
-    #define MAX_WIFI_CHANNEL      11    // Channel 13 is flaky, because of bad number 13 ;-)
+#define MIN_WIFI_CHANNEL      1
+#define MAX_WIFI_CHANNEL      11    // Channel 13 is flaky, because of bad number 13 ;-)
 
     int setConfigPortalChannel(const int& channel = 1)
     {
@@ -598,57 +600,57 @@ class WiFiManager_RP2040W_Lite
 
       return AP_channel;
     }
-    
+
     //////////////////////////////////////////////
-    
+
     void setConfigPortal(const String& ssid = "", const String& pass = "")
     {
       portal_ssid = ssid;
       portal_pass = pass;
     }
-    
+
     //////////////////////////////////////////////
 
     void setSTAStaticIPConfig(const IPAddress& ip)
     {
       static_IP = ip;
     }
-    
+
     //////////////////////////////////////////////
-    
+
     String getWiFiSSID(const uint8_t& index)
-    { 
+    {
       if (index >= NUM_WIFI_CREDENTIALS)
         return String("");
-        
+
       if (!hadConfigData)
         getConfigData();
 
       return (String(WIFI_GENERIC_config.WiFi_Creds[index].wifi_ssid));
     }
-    
+
     //////////////////////////////////////////////
 
     String getWiFiPW(const uint8_t& index)
     {
       if (index >= NUM_WIFI_CREDENTIALS)
         return String("");
-        
+
       if (!hadConfigData)
         getConfigData();
 
       return (String(WIFI_GENERIC_config.WiFi_Creds[index].wifi_pw));
     }
-    
+
     //////////////////////////////////////////////
 
     bool getWiFiStatus()
     {
       return wifi_connected;
     }
-    
+
     //////////////////////////////////////////////
-    
+
     WIFI_GENERIC_Configuration* getFullConfigData(WIFI_GENERIC_Configuration *configData)
     {
       if (!hadConfigData)
@@ -660,7 +662,7 @@ class WiFiManager_RP2040W_Lite
 
       return (configData);
     }
-    
+
     //////////////////////////////////////////////
 
     String localIP()
@@ -669,14 +671,14 @@ class WiFiManager_RP2040W_Lite
 
       return ipAddress;
     }
-    
+
     //////////////////////////////////////////////
 
     void clearConfigData()
     {
       memset(&WIFI_GENERIC_config, 0, sizeof(WIFI_GENERIC_config));
-      
-#if USE_DYNAMIC_PARAMETERS      
+
+#if USE_DYNAMIC_PARAMETERS
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
       {
         // Actual size of pdata is [maxlen + 1]
@@ -686,71 +688,72 @@ class WiFiManager_RP2040W_Lite
 
       saveConfigData();
     }
-    
+
     //////////////////////////////////////////////
-    
+
     bool isConfigDataValid()
     {
       return hadConfigData;
     }
-    
+
     //////////////////////////////////////////////
-    
+
     bool isConfigMode()
     {
       return configuration_mode;
     }
-    
+
     //////////////////////////////////////////////
-    
+
     // Forced CP => Flag = 0xBEEFBEEF. Else => No forced CP
-    // Flag to be stored at (EEPROM_START + DRD_FLAG_DATA_SIZE + CONFIG_DATA_SIZE) 
+    // Flag to be stored at (EEPROM_START + DRD_FLAG_DATA_SIZE + CONFIG_DATA_SIZE)
     // to avoid corruption to current data
     //#define FORCED_CONFIG_PORTAL_FLAG_DATA              ( (uint32_t) 0xDEADBEEF)
     //#define FORCED_PERS_CONFIG_PORTAL_FLAG_DATA         ( (uint32_t) 0xBEEFDEAD)
-    
+
     const uint32_t FORCED_CONFIG_PORTAL_FLAG_DATA       = 0xDEADBEEF;
     const uint32_t FORCED_PERS_CONFIG_PORTAL_FLAG_DATA  = 0xBEEFDEAD;
-    
-    #define FORCED_CONFIG_PORTAL_FLAG_DATA_SIZE     4
-    
+
+#define FORCED_CONFIG_PORTAL_FLAG_DATA_SIZE     4
+
     void resetAndEnterConfigPortal()
     {
       persForcedConfigPortal = false;
-      
+
       setForcedCP(false);
-      
+
       // Delay then reset the RP2040W after save data
       delay(1000);
       resetFunc();
     }
-    
+
     //////////////////////////////////////////////
-    
+
     // This will keep CP forever, until you successfully enter CP, and Save data to clear the flag.
     void resetAndEnterConfigPortalPersistent()
     {
       persForcedConfigPortal = true;
-      
+
       setForcedCP(true);
-      
+
       // Delay then reset the ESP8266 after save data
       delay(1000);
       resetFunc();
     }
-    
+
     //////////////////////////////////////////////
 
     void resetFunc()
-    {    
-      // Restart for RP2040W
+    {
+      // Restart for RP2040W, use either one is OK
       NVIC_SystemReset();
+      //rp2040.reboot();
     }
 
     //////////////////////////////////////
-    
+
     // Add customs headers
-    
+
     // For configure CORS Header, default to WM_HTTP_CORS_ALLOW_ALL = "*"
 
 #if USING_CUSTOMS_STYLE
@@ -759,54 +762,64 @@ class WiFiManager_RP2040W_Lite
     // input{width:95%;}body{text-align: center;}
     // button{background-color:#16A1E7;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;}
     // fieldset{border-radius:0.3rem;margin:0px;}</style>";
-    void setCustomsStyle(const char* CustomsStyle = WIFI_GENERIC_HTML_HEAD_STYLE) 
+    void setCustomsStyle(const char* CustomsStyle = WIFI_GENERIC_HTML_HEAD_STYLE)
     {
       WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE = CustomsStyle;
-      WG_LOGDEBUG1(F("Set CustomsStyle to : "), WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE);
+      WG_LOGDEBUG1("Set CustomsStyle to : ", WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE);
     }
-    
+
     const char* getCustomsStyle()
     {
-      WG_LOGDEBUG1(F("Get CustomsStyle = "), WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE);
+      WG_LOGDEBUG1("Get CustomsStyle = ", WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE);
       return WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE;
     }
 #endif
 
-#if USING_CUSTOMS_HEAD_ELEMENT    
+#if USING_CUSTOMS_HEAD_ELEMENT
     //sets a custom element to add to head, like a new style tag
-    void setCustomsHeadElement(const char* CustomsHeadElement = NULL) 
+    void setCustomsHeadElement(const char* CustomsHeadElement = NULL)
     {
       _CustomsHeadElement = CustomsHeadElement;
-      WG_LOGDEBUG1(F("Set CustomsHeadElement to : "), _CustomsHeadElement);
+      WG_LOGDEBUG1("Set CustomsHeadElement to : ", _CustomsHeadElement);
     }
-    
+
     const char* getCustomsHeadElement()
     {
-      WG_LOGDEBUG1(F("Get CustomsHeadElement = "), _CustomsHeadElement);
+      WG_LOGDEBUG1("Get CustomsHeadElement = ", _CustomsHeadElement);
       return _CustomsHeadElement;
     }
 #endif
-    
-#if USING_CORS_FEATURE   
+
+#if USING_CORS_FEATURE
     void setCORSHeader(const char* CORSHeaders = NULL)
-    {     
+    {
       _CORS_Header = CORSHeaders;
 
-      WG_LOGDEBUG1(F("Set CORS Header to : "), _CORS_Header);
+      WG_LOGDEBUG1("Set CORS Header to : ", _CORS_Header);
     }
-    
+
     const char* getCORSHeader()
-    {      
-      WG_LOGDEBUG1(F("Get CORS Header = "), _CORS_Header);
+    {
+      WG_LOGDEBUG1("Get CORS Header = ", _CORS_Header);
       return _CORS_Header;
     }
 #endif
 
     bool WiFiConnected()
     {
-      return ( (WiFi.status() == WL_CONNECTED) && (WiFi.RSSI() != 0) );
+      // You can change longer or shorter depending on your network response
+      // Shorter => more responsive, but more ping traffic
+      static uint8_t theTTL = 10;
+
+      // Use ping() to test TCP connections
+      if (WiFi.ping(WiFi.gatewayIP(), theTTL) == theTTL)
+      {
+        return true;
+      }
+
+      return false;
     }
-          
+
     //////////////////////////////////////
 
 
@@ -814,24 +827,24 @@ class WiFiManager_RP2040W_Lite
     String ipAddress = "0.0.0.0";
 
     WiFiWebServer* server = NULL;
-    
+
     bool configuration_mode = false;
 
     unsigned long configTimeout;
     bool hadConfigData = false;
-    
+
     bool isForcedConfigPortal   = false;
     bool persForcedConfigPortal = false;
 
     WIFI_GENERIC_Configuration WIFI_GENERIC_config;
-    
+
     uint16_t totalDataSize = 0;
 
     String macAddress = "";
     bool wifi_connected = false;
 
     //IPAddress portal_apIP = IPAddress(192, 168, 3, 1);
-    
+
     int AP_channel = 10;
 
     String portal_ssid = "";
@@ -840,29 +853,29 @@ class WiFiManager_RP2040W_Lite
     IPAddress static_IP   = IPAddress(0, 0, 0, 0);
 
     /////////////////////////////////////
-       
+
 #if USING_CUSTOMS_STYLE
     const char* WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE = NULL;
 #endif
-    
+
 #if USING_CUSTOMS_HEAD_ELEMENT
     const char* _CustomsHeadElement = NULL;
 #endif
-    
-#if USING_CORS_FEATURE    
+
+#if USING_CORS_FEATURE
     const char* _CORS_Header        = WM_HTTP_CORS_ALLOW_ALL;   //"*";
 #endif
-       
+
     /////////////////////////////////////
-    
+
 #if SCAN_WIFI_NETWORKS
-  int WiFiNetworksFound = 0;		// Number of SSIDs found by WiFi scan, including low quality and duplicates
-  int *indices;					        // WiFi network data, filled by scan (SSID, BSSID)
-  String ListOfSSIDs = "";		  // List of SSIDs found by scan, in HTML <option> format
+    int WiFiNetworksFound = 0;    // Number of SSIDs found by WiFi scan, including low quality and duplicates
+    int *indices;                 // WiFi network data, filled by scan (SSID, BSSID)
+    String ListOfSSIDs = "";      // List of SSIDs found by scan, in HTML <option> format
 #endif
 
     //////////////////////////////////////
-    
+
 #define RFC952_HOSTNAME_MAXLEN      24
 
     char RFC952_hostname[RFC952_HOSTNAME_MAXLEN + 1];
@@ -889,39 +902,39 @@ class WiFiManager_RP2040W_Lite
 
       return RFC952_hostname;
     }
-    
+
     void displayConfigData(const WIFI_GENERIC_Configuration& configData)
     {
-      WG_LOGERROR5(F("Hdr="),   configData.header, F(",SSID="), configData.WiFi_Creds[0].wifi_ssid,
-                   F(",PW="),   configData.WiFi_Creds[0].wifi_pw);
-      WG_LOGERROR3(F("SSID1="), configData.WiFi_Creds[1].wifi_ssid, F(",PW1="),  configData.WiFi_Creds[1].wifi_pw);     
-      WG_LOGERROR1(F("BName="), configData.board_name);     
-                 
-#if USE_DYNAMIC_PARAMETERS     
+      WG_LOGERROR5("Hdr=",   configData.header, ",SSID=", configData.WiFi_Creds[0].wifi_ssid,
+                   ",PW=",   configData.WiFi_Creds[0].wifi_pw);
+      WG_LOGERROR3("SSID1=", configData.WiFi_Creds[1].wifi_ssid, ",PW1=",  configData.WiFi_Creds[1].wifi_pw);
+      WG_LOGERROR1("BName=", configData.board_name);
+
+#if USE_DYNAMIC_PARAMETERS
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
       {
         WG_LOGERROR5("i=", i, ",id=", myMenuItems[i].id, ",data=", myMenuItems[i].pdata);
       }
-#endif               
+#endif
     }
 
     void displayWiFiData()
     {
-      WG_LOGERROR3(F("SSID="), WiFi.SSID(), F(",RSSI="), WiFi.RSSI());
-      WG_LOGERROR1(F("IP="), localIP() );
+      WG_LOGERROR3("SSID=", WiFi.SSID(), "IP=", localIP());
     }
-//////////////////////////////////////////////
+    //////////////////////////////////////////////
 
-    void wifiMulti_addAP()    
+    void wifiMulti_addAP()
     {
       for (uint8_t index = 0; index < NUM_WIFI_CREDENTIALS; index++)
       {
-        wifiMulti.addAP(WIFI_GENERIC_config.WiFi_Creds[index].wifi_ssid, WIFI_GENERIC_config.WiFi_Creds[index].wifi_pw);
-  	  }
-  	}  
-    
+        wifiMulti.addAP(WIFI_GENERIC_config.WiFi_Creds[index].wifi_ssid,
+                        WIFI_GENERIC_config.WiFi_Creds[index].wifi_pw);
+      }
+    }
+
     //////////////////////////////////////////////
-    
+
 #define WIFI_GENERIC_BOARD_TYPE   "RP2040W-WIFI"
 #define WM_NO_CONFIG              "blank"
 
@@ -935,198 +948,226 @@ class WiFiManager_RP2040W_Lite
 
       return checkSum;
     }
-    
-// Use LittleFS/InternalFS for RP2040W
 
-#define  CONFIG_FILENAME                  "/littlefs/config.dat"
-#define  CREDENTIALS_FILENAME             "/littlefs/cred.dat"
-#define  CONFIG_PORTAL_FILENAME           "/littlefs/cp.dat"
+    // Use LittleFS for RP2040W
+
+#define  CONFIG_FILENAME                  ("config.dat")
+#define  CONFIG_FILENAME_BACKUP           ("config.bak")
+
+#define  CREDENTIALS_FILENAME             ("credls.dat")
+#define  CREDENTIALS_FILENAME_BACKUP      ("credls.bak")
+
+#define  CONFIG_PORTAL_FILENAME           ("cfgprt.dat")
+#define  CONFIG_PORTAL_FILENAME_BACKUP    ("cfgprt.bak")
 
 
     //////////////////////////////////////////////
-    
+
     void saveForcedCP(const uint32_t& value)
     {
       // RP2040W code
-      FILE *file = fopen(CONFIG_PORTAL_FILENAME, "w");
-      
-      WG_LOGERROR(F("SaveCPFile "));
+      File file = LittleFS.open(CONFIG_PORTAL_FILENAME, "w");
+
+      WG_LOGERROR("SaveCPFile ");
 
       if (file)
       {
-        fseek(file, 0, SEEK_SET);
-        fwrite((uint8_t *) &value, sizeof(value), 1, file);
-        fflush(file);    
-        fclose(file);
-        
-        WG_LOGERROR(F("OK"));
+        //file.seek(0);
+        file.write((uint8_t*) &value, sizeof(value));
+        file.close();
+        WG_LOGINFO("OK");
       }
       else
       {
-        WG_LOGERROR(F("failed"));
+        WG_LOGINFO("failed");
+      }
+
+      // Trying open redundant CP file
+      file = LittleFS.open(CONFIG_PORTAL_FILENAME_BACKUP, "w");
+
+      WG_LOGINFO("SaveBkUpCPFile ");
+
+      if (file)
+      {
+        //file.seek(0);
+        file.write((uint8_t *) &value, sizeof(value));
+        file.close();
+        WG_LOGINFO("OK");
+      }
+      else
+      {
+        WG_LOGINFO("failed");
       }
     }
-    
+
     //////////////////////////////////////////////
-    
+
     void setForcedCP(const bool& isPersistent)
     {
-      uint32_t readForcedConfigPortalFlag = isPersistent? FORCED_PERS_CONFIG_PORTAL_FLAG_DATA : FORCED_CONFIG_PORTAL_FLAG_DATA;
-  
-      WG_LOGERROR(isPersistent ? F("setForcedCP Persistent") : F("setForcedCP non-Persistent"));
-      
+      uint32_t readForcedConfigPortalFlag = isPersistent ? FORCED_PERS_CONFIG_PORTAL_FLAG_DATA : FORCED_CONFIG_PORTAL_FLAG_DATA;
+
+      WG_LOGERROR(isPersistent ? "setForcedCP Persistent" : "setForcedCP non-Persistent");
+
       saveForcedCP(readForcedConfigPortalFlag);
     }
-    
+
     //////////////////////////////////////////////
-    
+
     void clearForcedCP()
     {
       uint32_t readForcedConfigPortalFlag = 0;
-   
-      WG_LOGERROR(F("clearForcedCP"));
-      
+
+      WG_LOGERROR("clearForcedCP");
+
       saveForcedCP(readForcedConfigPortalFlag);
     }
-    
+
     //////////////////////////////////////////////
 
     bool isForcedCP()
     {
       uint32_t readForcedConfigPortalFlag;
-    
-      WG_LOGDEBUG(F("Check if isForcedCP"));
-      
-      FILE *file = fopen(CONFIG_PORTAL_FILENAME, "r");
-      
-      WG_LOGDEBUG(F("LoadCPFile "));
+
+      WG_LOGDEBUG("Check if isForcedCP");
+
+      File file = LittleFS.open(CONFIG_PORTAL_FILENAME, "r");
+      WG_LOGINFO("LoadCPFile ");
 
       if (!file)
       {
-        WG_LOGDEBUG(F("failed"));
-        
-        return false;
+        WG_LOGINFO("failed");
+
+        // Trying open redundant config file
+        file = LittleFS.open(CONFIG_PORTAL_FILENAME_BACKUP, "r");
+        WG_LOGINFO("LoadBkUpCPFile ");
+
+        if (!file)
+        {
+          WG_LOGINFO("failed");
+          return false;
+        }
       }
-           
-      fseek(file, 0, SEEK_SET);
-      fread((uint8_t *) &readForcedConfigPortalFlag, sizeof(readForcedConfigPortalFlag), 1, file);        
-      fclose(file);
-      WG_LOGDEBUG(F("OK"));
-      
-      
+
+      file.read((uint8_t *) &readForcedConfigPortalFlag, sizeof(readForcedConfigPortalFlag));
+      file.close();
+
+      WG_LOGINFO("OK");
+
       // Return true if forced CP (0xDEADBEEF read at offset EPROM_START + DRD_FLAG_DATA_SIZE + CONFIG_DATA_SIZE)
-      // => set flag noForcedConfigPortal = false     
+      // => set flag noForcedConfigPortal = false
       if (readForcedConfigPortalFlag == FORCED_CONFIG_PORTAL_FLAG_DATA)
-      {       
+      {
         persForcedConfigPortal = false;
         return true;
       }
       else if (readForcedConfigPortalFlag == FORCED_PERS_CONFIG_PORTAL_FLAG_DATA)
-      {       
+      {
         persForcedConfigPortal = true;
         return true;
       }
       else
-      {       
+      {
         return false;
       }
     }
-    
-    //////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////
 
 #if USE_DYNAMIC_PARAMETERS
-    
+
     bool checkDynamicData()
     {
       int checkSum = 0;
       int readCheckSum;
-      char* readBuffer = nullptr;
-           
-      FILE *file = fopen(CREDENTIALS_FILENAME, "r");
-      
-      WG_LOGDEBUG(F("LoadCredFile "));
+      char* readBuffer;
+
+      File file = LittleFS.open(CREDENTIALS_FILENAME, "r");
+      WG_LOGINFO("LoadCredFile ");
 
       if (!file)
       {
-        WG_LOGDEBUG(F("failed"));
-        
-        return false;
+        WG_LOGINFO("failed");
+
+        // Trying open redundant config file
+        file = LittleFS.open(CREDENTIALS_FILENAME_BACKUP, "r");
+        WG_LOGINFO("LoadBkUpCredFile ");
+
+        if (!file)
+        {
+          WG_LOGINFO("failed");
+          return false;
+        }
       }
-      
+
+      //file.seek(0);
+
       // Find the longest pdata, then dynamically allocate buffer. Remember to free when done
       // This is used to store tempo data to calculate checksum to see of data is valid
       // We dont like to destroy myMenuItems[i].pdata with invalid data
-      
+
       uint16_t maxBufferLength = 0;
-      
+
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-      {       
+      {
         if (myMenuItems[i].maxlen > maxBufferLength)
           maxBufferLength = myMenuItems[i].maxlen;
       }
-      
+
       if (maxBufferLength > 0)
       {
         readBuffer = new char[ maxBufferLength + 1 ];
-        
+
         // check to see NULL => stop and return false
         if (readBuffer == NULL)
         {
-          WG_LOGERROR(F("ChkCrR: Error can't allocate buffer."));
+          WG_LOGERROR("ChkCrR: Error can't allocate buffer.");
           return false;
-        }     
+        }
         else
         {
-          WG_LOGDEBUG1(F("ChkCrR: Buffer allocated, Sz="), maxBufferLength + 1);
-        }  
-          
-        uint16_t offset = 0;
-        
+          WG_LOGDEBUG1("ChkCrR: Buffer allocated, sz=", maxBufferLength + 1);
+        }
+
         for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-        {       
-          uint8_t * _pointer = (uint8_t *) readBuffer;
+        {
+          char* _pointer = readBuffer;
 
           // Actual size of pdata is [maxlen + 1]
           memset(readBuffer, 0, myMenuItems[i].maxlen + 1);
-          
-          // Redundant, but to be sure correct position         
-          fseek(file, offset, SEEK_SET);
-          fread(_pointer, myMenuItems[i].maxlen, 1, file);  
-           
-          offset += myMenuItems[i].maxlen;
-       
-          WG_LOGDEBUG3(F("ChkCrR:pdata="), readBuffer, F(",len="), myMenuItems[i].maxlen);         
-                 
-          for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++,_pointer++)
-          {         
-            checkSum += *_pointer;  
-          }       
+
+          file.read( (uint8_t *) _pointer, myMenuItems[i].maxlen);
+
+          WG_LOGDEBUG3("ChkCrR:pdata=", readBuffer, ",len=", myMenuItems[i].maxlen);
+
+          for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++, _pointer++)
+          {
+            checkSum += *_pointer;
+          }
         }
 
-        fread((uint8_t *) &readCheckSum, sizeof(readCheckSum), 1, file);
-        
-        WG_LOGDEBUG(F("OK"));
-        
-        fclose(file);
-        
-        WG_LOGERROR3(F("CrCCsum=0x"), String(checkSum, HEX), F(",CrRCsum=0x"), String(readCheckSum, HEX));
-        
-        if (readBuffer != nullptr)
+        file.read((uint8_t *) &readCheckSum, sizeof(readCheckSum));
+
+        WG_LOGINFO("OK");
+        file.close();
+
+        WG_LOGINFO3("CrCCsum=0x", String(checkSum, HEX), ",CrRCsum=0x", String(readCheckSum, HEX));
+
+        // Free buffer
+        if (readBuffer != NULL)
         {
-          // Free buffer
           delete [] readBuffer;
-          WG_LOGDEBUG(F("Buffer freed"));
+          WG_LOGDEBUG("Buffer freed");
         }
-        
+
         if ( checkSum == readCheckSum)
         {
           return true;
         }
       }
-      
+
       return false;
     }
-    
+
     //////////////////////////////////////////////
 
     bool loadDynamicData()
@@ -1134,120 +1175,151 @@ class WiFiManager_RP2040W_Lite
       int checkSum = 0;
       int readCheckSum;
       totalDataSize = sizeof(WIFI_GENERIC_config) + sizeof(readCheckSum);
-      
-      FILE *file = fopen(CREDENTIALS_FILENAME, "r");
-      
-      WG_LOGDEBUG(F("LoadCredFile "));
+
+      File file = LittleFS.open(CREDENTIALS_FILENAME, "r");
+      WG_LOGINFO("LoadCredFile ");
 
       if (!file)
       {
-        WG_LOGDEBUG(F("failed"));
-        
-        return false;
+        WG_LOGINFO("failed");
+
+        // Trying open redundant config file
+        file = LittleFS.open(CREDENTIALS_FILENAME_BACKUP, "r");
+        WG_LOGINFO("LoadBkUpCredFile ");
+
+        if (!file)
+        {
+          WG_LOGINFO("failed");
+          return false;
+        }
       }
-     
-      uint16_t offset = 0;
-      
+
+      //file.seek(0);
+
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-      {       
-        uint8_t * _pointer = (uint8_t *) myMenuItems[i].pdata;
+      {
+        char* _pointer = myMenuItems[i].pdata;
         totalDataSize += myMenuItems[i].maxlen;
 
         // Actual size of pdata is [maxlen + 1]
         memset(myMenuItems[i].pdata, 0, myMenuItems[i].maxlen + 1);
-        
-        // Redundant, but to be sure correct position
-        fseek(file, offset, SEEK_SET);
-        fread(_pointer, myMenuItems[i].maxlen, 1, file);
-        
-        offset += myMenuItems[i].maxlen;        
-    
-        WG_LOGDEBUG3(F("CrR:pdata="), myMenuItems[i].pdata, F(",len="), myMenuItems[i].maxlen);         
-               
-        for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++,_pointer++)
-        {         
-          checkSum += *_pointer;  
-        }       
+
+        file.read( (uint8_t *) _pointer, myMenuItems[i].maxlen);
+
+        WG_LOGDEBUG3("CrR:pdata=", myMenuItems[i].pdata, ",len=", myMenuItems[i].maxlen);
+
+        for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++, _pointer++)
+        {
+          checkSum += *_pointer;
+        }
       }
 
-      fread((uint8_t *) &readCheckSum, sizeof(readCheckSum), 1, file);
-      
-      WG_LOGDEBUG(F("OK"));
-      
-      fclose(file);
-      
-      WG_LOGDEBUG3(F("CrCCsum=0x"), String(checkSum, HEX), F(",CrRCsum=0x"), String(readCheckSum, HEX));
-      
+      file.read((uint8_t *) &readCheckSum, sizeof(readCheckSum));
+      file.close();
+
+      WG_LOGINFO("OK");
+
+      WG_LOGINFO3("CrCCsum=0x", String(checkSum, HEX), ",CrRCsum=0x", String(readCheckSum, HEX));
+
       if ( checkSum != readCheckSum)
       {
         return false;
       }
-      
-      return true;    
+
+      return true;
     }
-    
+
     //////////////////////////////////////////////
 
     void saveDynamicData()
     {
       int checkSum = 0;
-    
-      FILE *file = fopen(CREDENTIALS_FILENAME, "w");
-      
-      WG_LOGDEBUG(F("SaveCredFile "));
 
-      uint16_t offset = 0;
-      
+      File file = LittleFS.open(CREDENTIALS_FILENAME, "w");
+
+      WG_LOGINFO("SaveCredFile ");
+
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-      {       
-        uint8_t* _pointer = (uint8_t *) myMenuItems[i].pdata;
-       
-        WG_LOGDEBUG3(F("CW1:pdata="), myMenuItems[i].pdata, F(",len="), myMenuItems[i].maxlen);
-        
+      {
+        char* _pointer = myMenuItems[i].pdata;
+
+        WG_LOGDEBUG3("CW1:pdata=", myMenuItems[i].pdata, ",len=", myMenuItems[i].maxlen);
+
         if (file)
         {
-          // Redundant, but to be sure correct position
-          fseek(file, offset, SEEK_SET);
-          fwrite(_pointer, myMenuItems[i].maxlen, 1, file); 
-          
-          offset += myMenuItems[i].maxlen;      
+          file.write((uint8_t*) _pointer, myMenuItems[i].maxlen);
         }
         else
         {
-          WG_LOGDEBUG(F("failed"));
-        }        
-                     
-        for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++,_pointer++)
-        {         
-          checkSum += *_pointer;     
-         }
+          WG_LOGINFO("failed");
+        }
+
+        for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++, _pointer++)
+        {
+          checkSum += *_pointer;
+        }
       }
-      
+
       if (file)
       {
-        fwrite((uint8_t *) &checkSum, sizeof(checkSum), 1, file);
-        fflush(file);   
-        fclose(file);
-        
-        WG_LOGDEBUG(F("OK"));    
+        file.write((uint8_t*) &checkSum, sizeof(checkSum));
+        file.close();
+        WG_LOGINFO("OK");
       }
       else
       {
-        WG_LOGDEBUG(F("failed"));
-      }   
-           
-      WG_LOGDEBUG1(F("CrWCSum=0x"), String(checkSum, HEX));
+        WG_LOGINFO("failed");
+      }
+
+      WG_LOGINFO1("CrWCSum=0x", String(checkSum, HEX));
+
+      // Trying open redundant Auth file
+      file = LittleFS.open(CREDENTIALS_FILENAME_BACKUP, "w");
+      WG_LOGINFO("SaveBkUpCredFile ");
+
+      for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
+      {
+        char* _pointer = myMenuItems[i].pdata;
+
+        WG_LOGDEBUG3("CW2:pdata=", myMenuItems[i].pdata, ",len=", myMenuItems[i].maxlen);
+
+        if (file)
+        {
+          file.write((uint8_t*) _pointer, myMenuItems[i].maxlen);
+        }
+        else
+        {
+          WG_LOGINFO("failed");
+        }
+
+        for (uint16_t j = 0; j < myMenuItems[i].maxlen; j++, _pointer++)
+        {
+          checkSum += *_pointer;
+        }
+      }
+
+      if (file)
+      {
+        file.write((uint8_t*) &checkSum, sizeof(checkSum));
+        file.close();
+        WG_LOGINFO("OK");
+      }
+      else
+      {
+        WG_LOGINFO("failed");
+      }
     }
-#endif
+
+#endif    // #if USE_DYNAMIC_PARAMETERS
 
     //////////////////////////////////////////////
-    
+
     void NULLTerminateConfig()
     {
       //#define HEADER_MAX_LEN      24
       //#define SERVER_MAX_LEN      32
       //#define TOKEN_MAX_LEN       36
-      
+
       // NULL Terminating to be sure
       WIFI_GENERIC_config.header[HEADER_MAX_LEN - 1] = 0;
       WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid[SSID_MAX_LEN - 1] = 0;
@@ -1258,200 +1330,228 @@ class WiFiManager_RP2040W_Lite
     }
 
     //////////////////////////////////////////////
-    
+
     bool isWiFiConfigValid()
     {
-      #if REQUIRE_ONE_SET_SSID_PW
+#if REQUIRE_ONE_SET_SSID_PW
       // If SSID ="blank" or NULL, or PWD length < 8 (as required by standard) => return false
       // Only need 1 set of valid SSID/PWD
-      if (!( ( ( strncmp(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid, WM_NO_CONFIG, strlen(WM_NO_CONFIG)) && 
+      if (!( ( ( strncmp(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid, WM_NO_CONFIG, strlen(WM_NO_CONFIG)) &&
                  strlen(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid) >  0 )  &&
-             (   strlen(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw) >= PASSWORD_MIN_LEN ) ) ||
-             ( ( strncmp(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid, WM_NO_CONFIG, strlen(WM_NO_CONFIG)) && 
+               ( strlen(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw) >= PASSWORD_MIN_LEN ) ) ||
+             ( ( strncmp(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid, WM_NO_CONFIG, strlen(WM_NO_CONFIG)) &&
                  strlen(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid) >  0 )  &&
                ( strlen(WIFI_GENERIC_config.WiFi_Creds[1].wifi_pw) >= PASSWORD_MIN_LEN ) ) ))
-      #else
+#else
       // If SSID ="blank" or NULL, or PWD length < 8 (as required by standard) => invalid set
       // Need both sets of valid SSID/PWD
       if ( !strncmp(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid,   WM_NO_CONFIG, strlen(WM_NO_CONFIG) )  ||
            !strncmp(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw,     WM_NO_CONFIG, strlen(WM_NO_CONFIG) )  ||
            !strncmp(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid,   WM_NO_CONFIG, strlen(WM_NO_CONFIG) )  ||
            !strncmp(WIFI_GENERIC_config.WiFi_Creds[1].wifi_pw,     WM_NO_CONFIG, strlen(WM_NO_CONFIG) )  ||
-           ( strlen(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid) == 0 ) || 
+           ( strlen(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid) == 0 ) ||
            ( strlen(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid) == 0 ) ||
            ( strlen(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw)   < PASSWORD_MIN_LEN ) ||
            ( strlen(WIFI_GENERIC_config.WiFi_Creds[1].wifi_pw)   < PASSWORD_MIN_LEN ) )
-      #endif     
+#endif
       {
         // If SSID, PW ="blank" or NULL, set the flag
-        WG_LOGERROR(F("Invalid Stored WiFi Config Data"));
-        
+        WG_LOGERROR("Invalid Stored WiFi Config Data");
+
         // Nullify the invalid data to avoid displaying garbage
         memset(&WIFI_GENERIC_config, 0, sizeof(WIFI_GENERIC_config));
-        
+
         hadConfigData = false;
-        
+
         return false;
       }
-      
+
       return true;
     }
-    
-    //////////////////////////////////////////////  
+
+    //////////////////////////////////////////////
 
     bool loadConfigData()
     {
-      WG_LOGDEBUG(F("LoadCfgFile "));
-      
-      // file existed
-      FILE *file = fopen(CONFIG_FILENAME, "r");
-      
+      File file = LittleFS.open(CONFIG_FILENAME, "r");
+      WG_LOGINFO("LoadCfgFile ");
+
       if (!file)
       {
-        WG_LOGDEBUG(F("failed"));
-        
-        return false;
-      }
-     
-      fseek(file, 0, SEEK_SET);
-      fread((uint8_t *) &WIFI_GENERIC_config, sizeof(WIFI_GENERIC_config), 1, file);
-      fclose(file);
+        WG_LOGINFO("failed");
 
-      WG_LOGDEBUG(F("OK"));
-      
+        // Trying open redundant config file
+        file = LittleFS.open(CONFIG_FILENAME_BACKUP, "r");
+        WG_LOGINFO("LoadBkUpCfgFile ");
+
+        if (!file)
+        {
+          WG_LOGINFO("failed");
+          return false;
+        }
+      }
+
+      file.read((uint8_t *) &WIFI_GENERIC_config, sizeof(WIFI_GENERIC_config));
+
+      WG_LOGINFO("OK");
+
+      file.close();
+
       return isWiFiConfigValid();
     }
-    
+
     //////////////////////////////////////////////
 
     void saveConfigData()
     {
-      WG_LOGDEBUG(F("SaveCfgFile "));
+      File file = LittleFS.open(CONFIG_FILENAME, "w");
+      WG_LOGINFO("SaveCfgFile ");
 
       int calChecksum = calcChecksum();
       WIFI_GENERIC_config.checkSum = calChecksum;
-      WG_LOGDEBUG1(F("WCSum=0x"), String(calChecksum, HEX));
-      
-      FILE *file = fopen(CONFIG_FILENAME, "w");
+      WG_LOGINFO1("WCSum=0x", String(calChecksum, HEX));
 
       if (file)
       {
-        fseek(file, 0, SEEK_SET);
-        fwrite((uint8_t *) &WIFI_GENERIC_config, sizeof(WIFI_GENERIC_config), 1, file);
-        fflush(file);
-        fclose(file);
-        
-        WG_LOGDEBUG(F("OK"));
+        //file.seek(0);
+        file.write((uint8_t*) &WIFI_GENERIC_config, sizeof(WIFI_GENERIC_config));
+        file.close();
+        WG_LOGINFO("OK");
       }
       else
       {
-        WG_LOGDEBUG(F("failed"));
+        WG_LOGINFO("failed");
       }
-            
-#if USE_DYNAMIC_PARAMETERS      
+
+      // Trying open redundant Auth file
+      file = LittleFS.open(CONFIG_FILENAME_BACKUP, "w");
+      WG_LOGINFO("SaveBkUpCfgFile ");
+
+      if (file)
+      {
+        //file.seek(0);
+        file.write((uint8_t *) &WIFI_GENERIC_config, sizeof(WIFI_GENERIC_config));
+        file.close();
+        WG_LOGINFO("OK");
+      }
+      else
+      {
+        WG_LOGINFO("failed");
+      }
+    }
+
+    //////////////////////////////////////////////
+
+    void saveAllConfigData()
+    {
+      saveConfigData();
+
+#if USE_DYNAMIC_PARAMETERS
       saveDynamicData();
 #endif
-
-      wifiMulti_addAP();
     }
-    
+
     //////////////////////////////////////////////
-    
+
     void loadAndSaveDefaultConfigData()
     {
-      memset(&WIFI_GENERIC_config, 0, sizeof(WIFI_GENERIC_config));
       // Load Default Config Data from Sketch
       memcpy(&WIFI_GENERIC_config, &defaultConfig, sizeof(WIFI_GENERIC_config));
-      
-      strncpy(WIFI_GENERIC_config.header, WIFI_GENERIC_BOARD_TYPE, HEADER_MAX_LEN - 1);
-      
+      strcpy(WIFI_GENERIC_config.header, WIFI_GENERIC_BOARD_TYPE);
+
       // Including config and dynamic data, and assume valid
       saveConfigData();
-          
-      WG_LOGDEBUG(F("======= Start Loaded Config Data ======="));
-      displayConfigData(WIFI_GENERIC_config);    
+
+      WG_LOGERROR("======= Start Loaded Config Data =======");
+      displayConfigData(WIFI_GENERIC_config);
     }
-    
+
     //////////////////////////////////////////////
-    
+
     // Return false if init new EEPROM or SPIFFS. No more need trying to connect. Go directly to config mode
     bool getConfigData()
     {
-      bool dynamicDataValid = true; 
-      int calChecksum; 
-      
+      bool dynamicDataValid = true;
+      int calChecksum;
+
       hadConfigData = false;
-      
+
+      bool beginOK = LittleFS.begin();
+
+      if (!beginOK)
+      {
+        WG_LOGERROR("\nLittleFS error");
+      }
+
       // Use new LOAD_DEFAULT_CONFIG_DATA logic
       if (LOAD_DEFAULT_CONFIG_DATA)
-      {     
+      {
+        WG_LOGERROR("LOAD_DEFAULT_CONFIG_DATA");
+
         // Load Config Data from Sketch
-        loadAndSaveDefaultConfigData();
-        
+        memcpy(&WIFI_GENERIC_config, &defaultConfig, sizeof(WIFI_GENERIC_config));
+        strcpy(WIFI_GENERIC_config.header, WIFI_GENERIC_BOARD_TYPE);
+
+        // Including config and dynamic data, and assume valid
+        saveAllConfigData();
+
+        WG_LOGINFO("======= Start Loaded Config Data =======");
+        displayConfigData(WIFI_GENERIC_config);
+
         // Don't need Config Portal anymore
-        return true; 
+        return true;
       }
-      else
-      {   
+#if USE_DYNAMIC_PARAMETERS
+      else if ( ( FileFS.exists(CONFIG_FILENAME)      || FileFS.exists(CONFIG_FILENAME_BACKUP) ) &&
+                ( FileFS.exists(CREDENTIALS_FILENAME) || FileFS.exists(CREDENTIALS_FILENAME_BACKUP) ) )
+#else
+      else if ( FileFS.exists(CONFIG_FILENAME) || FileFS.exists(CONFIG_FILENAME_BACKUP) )
+#endif
+      {
         // Load stored config data from LittleFS
         // Get config data. If "blank" or NULL, set false flag and exit
         if (!loadConfigData())
         {
           return false;
         }
-        
-        // Verify ChkSum        
+
+        WG_LOGINFO("======= Start Stored Config Data =======");
+        displayConfigData(WIFI_GENERIC_config);
+
         calChecksum = calcChecksum();
 
-        WG_LOGERROR3(F("CCSum=0x"), String(calChecksum, HEX),
-                   F(",RCSum=0x"), String(WIFI_GENERIC_config.checkSum, HEX));
-        
-#if USE_DYNAMIC_PARAMETERS        
-        // Load stored dynamic data from LittleFS
-        dynamicDataValid = checkDynamicData();
+        WG_LOGINFO3("CCSum=0x", String(calChecksum, HEX),
+                    ",RCSum=0x", String(WIFI_GENERIC_config.checkSum, HEX));
+
+#if USE_DYNAMIC_PARAMETERS
+        // Load dynamic data
+        dynamicDataValid = loadDynamicData();
+
+        if (dynamicDataValid)
+        {
+          WG_LOGINFO("Valid Stored Dynamic Data");
+        }
+        else
+        {
+          WG_LOGINFO("Invalid Stored Dynamic Data. Ignored");
+        }
 #endif
-        
-        // If checksum = 0 => LittleFS has been cleared (by uploading new FW, etc) => force to CP
-        // If bad checksum = 0 => force to CP
-        if ( (calChecksum != 0) && (calChecksum == WIFI_GENERIC_config.checkSum) )
-        {       
-          if (dynamicDataValid)
-          {
-  #if USE_DYNAMIC_PARAMETERS        
-            loadDynamicData();
-             
-            WG_LOGERROR(F("Valid Stored Dynamic Data"));
-  #endif 
-         
-            WG_LOGERROR(F("======= Start Stored Config Data ======="));
-            displayConfigData(WIFI_GENERIC_config);
-            
-            // Don't need Config Portal anymore
-            return true;
-          }
-          else
-          {
-            // Invalid Stored config data => Config Portal
-            WG_LOGERROR(F("Invalid Stored Dynamic Data. Load default from Sketch"));
-            
-            // Load Default Config Data from Sketch, better than just "blank"
-            loadAndSaveDefaultConfigData();
-                             
-            // Need Config Portal here as data can be just dummy
-            // Even if you don't open CP, you're OK on next boot if your default config data is valid 
-            return false;
-          }
-        }   
-      }   
+      }
+      else
+      {
+        WG_LOGERROR("NO_CONFIG_DATA !!!");
+        // Not loading Default config data, but having no config file => Config Portal
+        return false;
+      }
 
       if ( (strncmp(WIFI_GENERIC_config.header, WIFI_GENERIC_BOARD_TYPE, strlen(WIFI_GENERIC_BOARD_TYPE)) != 0) ||
-           (calChecksum != WIFI_GENERIC_config.checkSum) || !dynamicDataValid || 
-           ( (calChecksum == 0) && (WIFI_GENERIC_config.checkSum == 0) ) )   
+           (calChecksum != WIFI_GENERIC_config.checkSum) || !dynamicDataValid ||
+           ( (calChecksum == 0) && (WIFI_GENERIC_config.checkSum == 0) ) )
       {
         // Including Credentials CSum
-        WG_LOGERROR1(F("InitCfgFile,sz="), sizeof(WIFI_GENERIC_config));
+        WG_LOGERROR1("InitCfgFile,sz=", sizeof(WIFI_GENERIC_config));
 
-        // doesn't have any configuration        
+        // doesn't have any configuration
         if (LOAD_DEFAULT_CONFIG_DATA)
         {
           memcpy(&WIFI_GENERIC_config, &defaultConfig, sizeof(WIFI_GENERIC_config));
@@ -1460,43 +1560,37 @@ class WiFiManager_RP2040W_Lite
         {
           memset(&WIFI_GENERIC_config, 0, sizeof(WIFI_GENERIC_config));
 
-#if USE_DYNAMIC_PARAMETERS
-          for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-          {
-            // Actual size of pdata is [maxlen + 1]
-            memset(myMenuItems[i].pdata, 0, myMenuItems[i].maxlen + 1);
-          }
-#endif
-              
           strncpy(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid,   WM_NO_CONFIG, SSID_MAX_LEN - 1);
           strncpy(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw,     WM_NO_CONFIG, PASS_MAX_LEN - 1);
           strncpy(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid,   WM_NO_CONFIG, SSID_MAX_LEN - 1);
           strncpy(WIFI_GENERIC_config.WiFi_Creds[1].wifi_pw,     WM_NO_CONFIG, PASS_MAX_LEN - 1);
           strncpy(WIFI_GENERIC_config.board_name,                WM_NO_CONFIG, BOARD_NAME_MAX_LEN - 1);
-          
+
 #if USE_DYNAMIC_PARAMETERS
           for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
           {
+            // Actual size of pdata is [maxlen + 1]
+            memset(myMenuItems[i].pdata, 0, myMenuItems[i].maxlen + 1);
             strncpy(myMenuItems[i].pdata, WM_NO_CONFIG, myMenuItems[i].maxlen);
           }
-#endif          
+#endif
         }
-    
+
         strcpy(WIFI_GENERIC_config.header, WIFI_GENERIC_BOARD_TYPE);
-        
+
 #if USE_DYNAMIC_PARAMETERS
         for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
         {
-          WG_LOGDEBUG3(F("g:myMenuItems["), i, F("]="), myMenuItems[i].pdata );
+          WG_LOGDEBUG3("g:myMenuItems[", i, "]=", myMenuItems[i].pdata );
         }
 #endif
-        
+
         // Don't need
         WIFI_GENERIC_config.checkSum = 0;
 
-        saveConfigData();
-        
-        return false;        
+        saveAllConfigData();
+
+        return false;
       }
       else if ( !isWiFiConfigValid() )
       {
@@ -1510,108 +1604,108 @@ class WiFiManager_RP2040W_Lite
 
       return true;
     }
-    
+
     //////////////////////////////////////////////
-   
+
     bool connectMultiWiFi(int retry_time)
     {
-			// For general board, this better be 1000 to enable connect the 1st time
-			#define WIFI_MULTI_1ST_CONNECT_WAITING_MS             1000L
+      // For general board, this better be 1000 to enable connect the 1st time
+#define WIFI_MULTI_1ST_CONNECT_WAITING_MS             1000L
 
-			#define WIFI_MULTI_CONNECT_WAITING_MS                 500L
+#define WIFI_MULTI_CONNECT_WAITING_MS                 500L
 
-			WG_LOGDEBUG("No WiFi. Trying to scan and reconnect");
+      WG_LOGDEBUG("No WiFi. Trying to scan and reconnect");
 
-			WiFi.disconnect();
+      WiFi.disconnect();
 
-			int i = 0;
+      int i = 0;
 
-			uint8_t status = wifiMulti.run();
+      uint8_t status = wifiMulti.run();
 
-			delay(WIFI_MULTI_1ST_CONNECT_WAITING_MS);
+      delay(WIFI_MULTI_1ST_CONNECT_WAITING_MS);
 
-			while ( ( i++ < (retry_time * 5) ) && ( status != WL_CONNECTED ) )
-			{
-				status = WiFi.status();
+      while ( ( i++ < (retry_time * 5) ) && ( status != WL_CONNECTED ) )
+      {
+        status = WiFi.status();
 
-				if ( status == WL_CONNECTED )
-				  break;
-				else
-				  delay(WIFI_MULTI_CONNECT_WAITING_MS);
-			}
+        if ( status == WL_CONNECTED )
+          break;
+        else
+          delay(WIFI_MULTI_CONNECT_WAITING_MS);
+      }
 
-			if ( status == WL_CONNECTED )
-			{
-				WG_LOGERROR1(F("WiFi connected after time: "), i);
-				WG_LOGERROR3(F("SSID:"), WiFi.SSID(), F(",RSSI="), WiFi.RSSI());
-				WG_LOGERROR1(F("IP address:"), WiFi.localIP() );
-			}
-			else
-			{
-				WG_LOGERROR(F("WiFi not connected"));
+      if ( status == WL_CONNECTED )
+      {
+        WG_LOGERROR1("WiFi connected after time: ", i);
+        WG_LOGERROR3("SSID:", WiFi.SSID(), ",RSSI=", WiFi.RSSI());
+        WG_LOGERROR1("IP address:", WiFi.localIP() );
+      }
+      else
+      {
+        WG_LOGERROR("WiFi not connected");
 
-				if (wifiMulti.run() != WL_CONNECTED)
-				{
-				  Serial.println("WiFi not connected!");
-				  delay(1000);
-				}
-			}
+        if (wifiMulti.run() != WL_CONNECTED)
+        {
+          Serial.println("WiFi not connected!");
+          delay(1000);
+        }
+      }
 
-			return (status == WL_CONNECTED);
+      return (status == WL_CONNECTED);
     }
-    
+
     //////////////////////////////////////////////
-    
+
     // NEW
     void createHTML(String& root_html_template)
     {
       String pitem;
-      
+
       root_html_template  = WIFI_GENERIC_HTML_HEAD_START;
-      
-  #if USING_CUSTOMS_STYLE
+
+#if USING_CUSTOMS_STYLE
       // Using Customs style when not NULL
       if (WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE)
         root_html_template  += WIFI_GENERIC_HTML_HEAD_CUSTOMS_STYLE;
       else
         root_html_template  += WIFI_GENERIC_HTML_HEAD_STYLE;
-  #else     
+#else
       root_html_template  += WIFI_GENERIC_HTML_HEAD_STYLE;
-  #endif
-      
-  #if USING_CUSTOMS_HEAD_ELEMENT
+#endif
+
+#if USING_CUSTOMS_HEAD_ELEMENT
       if (_CustomsHeadElement)
         root_html_template += _CustomsHeadElement;
-  #endif          
-      
+#endif
+
 #if SCAN_WIFI_NETWORKS
-      WG_LOGDEBUG1(WiFiNetworksFound, F(" SSIDs found, generating HTML now"));
+      WG_LOGDEBUG1(WiFiNetworksFound, " SSIDs found, generating HTML now");
       // Replace HTML <input...> with <select...>, based on WiFi network scan in startConfigurationMode()
 
       ListOfSSIDs = "";
 
       for (int i = 0, list_items = 0; (i < WiFiNetworksFound) && (list_items < MAX_SSID_IN_LIST); i++)
       {
-        if (indices[i] == -1) 
-          continue; 		// skip duplicates and those that are below the required quality
-          
-        ListOfSSIDs += WIFI_GENERIC_OPTION_START + String(WiFi.SSID(indices[i])) + WIFI_GENERIC_OPTION_END;	
-        list_items++;		// Count number of suitable, distinct SSIDs to be included in list
+        if (indices[i] == -1)
+          continue;     // skip duplicates and those that are below the required quality
+
+        ListOfSSIDs += WIFI_GENERIC_OPTION_START + String(WiFi.SSID(indices[i])) + WIFI_GENERIC_OPTION_END;
+        list_items++;   // Count number of suitable, distinct SSIDs to be included in list
       }
 
       WG_LOGDEBUG(ListOfSSIDs);
 
-      if (ListOfSSIDs == "")		// No SSID found or none was good enough
+      if (ListOfSSIDs == "")    // No SSID found or none was good enough
         ListOfSSIDs = WIFI_GENERIC_OPTION_START + String(WIFI_GENERIC_NO_NETWORKS_FOUND) + WIFI_GENERIC_OPTION_END;
 
       pitem = String(WIFI_GENERIC_HTML_HEAD_END);
 
 #if MANUAL_SSID_INPUT_ALLOWED
       pitem.replace("[[input_id]]",  "<input id='id' list='SSIDs'>"  + String(WIFI_GENERIC_DATALIST_START) + "'SSIDs'>" + ListOfSSIDs + WIFI_GENERIC_DATALIST_END);
-      WG_LOGDEBUG1(F("pitem:"), pitem);
+      WG_LOGDEBUG1("pitem:", pitem);
       pitem.replace("[[input_id1]]", "<input id='id1' list='SSIDs'>" + String(WIFI_GENERIC_DATALIST_START) + "'SSIDs'>" + ListOfSSIDs + WIFI_GENERIC_DATALIST_END);
-      
-      WG_LOGDEBUG1(F("pitem:"), pitem);
+
+      WG_LOGDEBUG1("pitem:", pitem);
 
 #else
       pitem.replace("[[input_id]]",  "<select id='id'>"  + ListOfSSIDs + WIFI_GENERIC_SELECT_END);
@@ -1629,7 +1723,7 @@ class WiFiManager_RP2040W_Lite
 
 #endif    // SCAN_WIFI_NETWORKS
 
-#if USE_DYNAMIC_PARAMETERS      
+#if USE_DYNAMIC_PARAMETERS
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
       {
         pitem = String(WIFI_GENERIC_HTML_PARAM);
@@ -1637,65 +1731,65 @@ class WiFiManager_RP2040W_Lite
         pitem.replace("{b}", myMenuItems[i].displayName);
         pitem.replace("{v}", myMenuItems[i].id);
         pitem.replace("{i}", myMenuItems[i].id);
-        
+
         root_html_template += pitem;
       }
 #endif
-      
-      root_html_template += String(WIFI_GENERIC_FLDSET_END) + WIFI_GENERIC_HTML_BUTTON + WIFI_GENERIC_HTML_SCRIPT;     
 
-#if USE_DYNAMIC_PARAMETERS      
+      root_html_template += String(WIFI_GENERIC_FLDSET_END) + WIFI_GENERIC_HTML_BUTTON + WIFI_GENERIC_HTML_SCRIPT;
+
+#if USE_DYNAMIC_PARAMETERS
       for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
       {
         pitem = String(WIFI_GENERIC_HTML_SCRIPT_ITEM);
-        
+
         pitem.replace("{d}", myMenuItems[i].id);
-        
+
         root_html_template += pitem;
       }
 #endif
-      
+
       root_html_template += String(WIFI_GENERIC_HTML_SCRIPT_END) + WIFI_GENERIC_HTML_END;
-      
-      return;     
+
+      return;
     }
-       
+
     //////////////////////////////////////////////
 
     void serverSendHeaders()
     {
-      WG_LOGDEBUG3(F("serverSendHeaders:WM_HTTP_CACHE_CONTROL:"), WM_HTTP_CACHE_CONTROL, "=", WM_HTTP_NO_STORE);
+      WG_LOGDEBUG3("serverSendHeaders:WM_HTTP_CACHE_CONTROL:", WM_HTTP_CACHE_CONTROL, "=", WM_HTTP_NO_STORE);
       server->sendHeader(WM_HTTP_CACHE_CONTROL, WM_HTTP_NO_STORE);
-      
+
 #if USING_CORS_FEATURE
       // For configure CORS Header, default to WM_HTTP_CORS_ALLOW_ALL = "*"
-      WG_LOGDEBUG3(F("serverSendHeaders:WM_HTTP_CORS:"), WM_HTTP_CORS, " : ", _CORS_Header);
+      WG_LOGDEBUG3("serverSendHeaders:WM_HTTP_CORS:", WM_HTTP_CORS, " : ", _CORS_Header);
       server->sendHeader(WM_HTTP_CORS, _CORS_Header);
 #endif
-     
-      WG_LOGDEBUG3(F("serverSendHeaders:WM_HTTP_PRAGMA:"), WM_HTTP_PRAGMA, " : ", WM_HTTP_NO_CACHE);
+
+      WG_LOGDEBUG3("serverSendHeaders:WM_HTTP_PRAGMA:", WM_HTTP_PRAGMA, " : ", WM_HTTP_NO_CACHE);
       server->sendHeader(WM_HTTP_PRAGMA, WM_HTTP_NO_CACHE);
-      
-      WG_LOGDEBUG3(F("serverSendHeaders:WM_HTTP_EXPIRES:"), WM_HTTP_EXPIRES, " : ", "-1");
+
+      WG_LOGDEBUG3("serverSendHeaders:WM_HTTP_EXPIRES:", WM_HTTP_EXPIRES, " : ", "-1");
       server->sendHeader(WM_HTTP_EXPIRES, "-1");
     }
-       
+
     //////////////////////////////////////////////
 
     void handleRequest()
     {
       if (server)
-      {        
+      {
         String key    = server->arg("key");
         String value  = server->arg("value");
 
         static int number_items_Updated = 0;
 
         if (key == "" && value == "")
-        {       
-          serverSendHeaders();        
+        {
+          serverSendHeaders();
           //////
-          
+
           String result;
           createHTML(result);
 
@@ -1729,8 +1823,8 @@ class WiFiManager_RP2040W_Lite
             result.replace("[[pw1]]", "");
             result.replace("[[nm]]",  "");
           }
-          
-#if USE_DYNAMIC_PARAMETERS          
+
+#if USE_DYNAMIC_PARAMETERS
           for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
           {
             String toChange = String("[[") + myMenuItems[i].id + "]]";
@@ -1739,9 +1833,9 @@ class WiFiManager_RP2040W_Lite
 #endif
 
 
-          WG_LOGDEBUG1(F("h:HTML page size:"), result.length());
-          WG_LOGDEBUG1(F("h:HTML="), result);
-          
+          WG_LOGDEBUG1("h:HTML page size:", result.length());
+          WG_LOGDEBUG1("h:HTML=", result);
+
           server->send(200, WM_HTTP_HEAD_TEXT_HTML, result);
 
           return;
@@ -1758,22 +1852,22 @@ class WiFiManager_RP2040W_Lite
         {
           // Don't need to free
           menuItemUpdated = new bool[NUM_MENU_ITEMS];
-          
+
           if (menuItemUpdated)
           {
             for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-            {           
+            {
               // To flag item is not yet updated
-              menuItemUpdated[i] = false;       
+              menuItemUpdated[i] = false;
             }
-            
-            WG_LOGDEBUG1(F("h: Init menuItemUpdated :" ), NUM_MENU_ITEMS);                    
+
+            WG_LOGDEBUG1("h: Init menuItemUpdated :", NUM_MENU_ITEMS);
           }
           else
           {
-            WG_LOGERROR(F("h: Error can't alloc memory for menuItemUpdated" ));
+            WG_LOGERROR("h: Error can't alloc memory for menuItemUpdated");
           }
-        }  
+        }
 #endif
 
         static bool id_Updated  = false;
@@ -1781,46 +1875,50 @@ class WiFiManager_RP2040W_Lite
         static bool id1_Updated = false;
         static bool pw1_Updated = false;
         static bool nm_Updated  = false;
-          
+
         if (!id_Updated && (key == String("id")))
-        {   
-          WG_LOGDEBUG(F("h:repl id"));
+        {
+          WG_LOGDEBUG("h:repl id");
           id_Updated = true;
-          
+
           number_items_Updated++;
+          
           if (strlen(value.c_str()) < sizeof(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid) - 1)
             strcpy(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid, value.c_str());
           else
             strncpy(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid, value.c_str(), sizeof(WIFI_GENERIC_config.WiFi_Creds[0].wifi_ssid) - 1);
         }
         else if (!pw_Updated && (key == String("pw")))
-        {    
-          WG_LOGDEBUG(F("h:repl pw"));
+        {
+          WG_LOGDEBUG("h:repl pw");
           pw_Updated = true;
-          
+
           number_items_Updated++;
+          
           if (strlen(value.c_str()) < sizeof(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw) - 1)
             strcpy(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw, value.c_str());
           else
             strncpy(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw, value.c_str(), sizeof(WIFI_GENERIC_config.WiFi_Creds[0].wifi_pw) - 1);
         }
         else if (!id1_Updated && (key == String("id1")))
-        {   
-          WG_LOGDEBUG(F("h:repl id1"));
+        {
+          WG_LOGDEBUG("h:repl id1");
           id1_Updated = true;
-          
+
           number_items_Updated++;
+          
           if (strlen(value.c_str()) < sizeof(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid) - 1)
             strcpy(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid, value.c_str());
           else
             strncpy(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid, value.c_str(), sizeof(WIFI_GENERIC_config.WiFi_Creds[1].wifi_ssid) - 1);
         }
         else if (!pw1_Updated && (key == String("pw1")))
-        {    
-          WG_LOGDEBUG(F("h:repl pw1"));
+        {
+          WG_LOGDEBUG("h:repl pw1");
           pw1_Updated = true;
-          
+
           number_items_Updated++;
+          
           if (strlen(value.c_str()) < sizeof(WIFI_GENERIC_config.WiFi_Creds[1].wifi_pw) - 1)
             strcpy(WIFI_GENERIC_config.WiFi_Creds[1].wifi_pw, value.c_str());
           else
@@ -1828,28 +1926,29 @@ class WiFiManager_RP2040W_Lite
         }
         else if (!nm_Updated && (key == String("nm")))
         {
-          WG_LOGDEBUG(F("h:repl nm"));
+          WG_LOGDEBUG("h:repl nm");
           nm_Updated = true;
-          
+
           number_items_Updated++;
+          
           if (strlen(value.c_str()) < sizeof(WIFI_GENERIC_config.board_name) - 1)
             strcpy(WIFI_GENERIC_config.board_name, value.c_str());
           else
             strncpy(WIFI_GENERIC_config.board_name, value.c_str(), sizeof(WIFI_GENERIC_config.board_name) - 1);
         }
 
-        
-#if USE_DYNAMIC_PARAMETERS 
+
+#if USE_DYNAMIC_PARAMETERS
         else
-        {       
+        {
           for (uint16_t i = 0; i < NUM_MENU_ITEMS; i++)
-          {           
+          {
             if ( !menuItemUpdated[i] && (key == myMenuItems[i].id) )
             {
-              WG_LOGDEBUG3(F("h:"), myMenuItems[i].id, F("="), value.c_str() );
-              
+              WG_LOGDEBUG3("h:", myMenuItems[i].id, "=", value.c_str() );
+
               menuItemUpdated[i] = true;
-              
+
               number_items_Updated++;
 
               // Actual size of pdata is [maxlen + 1]
@@ -1859,33 +1958,33 @@ class WiFiManager_RP2040W_Lite
                 strcpy(myMenuItems[i].pdata, value.c_str());
               else
                 strncpy(myMenuItems[i].pdata, value.c_str(), myMenuItems[i].maxlen);
-                
-              break;  
+
+              break;
             }
           }
         }
 #endif
-        
-        WG_LOGDEBUG1(F("h:items updated ="), number_items_Updated);
-        WG_LOGDEBUG3(F("h:key ="), key, ", value =", value);
+
+        WG_LOGDEBUG1("h:items updated =", number_items_Updated);
+        WG_LOGDEBUG3("h:key =", key, ", value =", value);
 
         server->send(200, WM_HTTP_HEAD_TEXT_HTML, "OK");
 
-#if USE_DYNAMIC_PARAMETERS        
+#if USE_DYNAMIC_PARAMETERS
         if (number_items_Updated == NUM_CONFIGURABLE_ITEMS + NUM_MENU_ITEMS)
 #else
         if (number_items_Updated == NUM_CONFIGURABLE_ITEMS)
-#endif 
+#endif
         {
-          WG_LOGERROR(F("\nh:UpdLittleFS"));
+          WG_LOGERROR("\nh:UpdLittleFS");
 
-          saveConfigData();
-          
+          saveAllConfigData();
+
           // Done with CP, Clear CP Flag here if forced
           if (isForcedConfigPortal)
             clearForcedCP();
 
-          WG_LOGERROR(F("h:Rst"));
+          WG_LOGERROR("h:Rst");
 
           // TO DO : what command to reset
           // Delay then reset the board after save data
@@ -1894,22 +1993,22 @@ class WiFiManager_RP2040W_Lite
         }
       }   // if (server)
     }
-    
+
     //////////////////////////////////////////////
 
 #ifndef CONFIG_TIMEOUT
-  #warning Default CONFIG_TIMEOUT = 60s
-  #define CONFIG_TIMEOUT			60000L
+#warning Default CONFIG_TIMEOUT = 60s
+#define CONFIG_TIMEOUT      60000L
 #endif
 
     void startConfigurationMode()
     {
 #if SCAN_WIFI_NETWORKS
-	    configTimeout = 0;  // To allow user input in CP
-	    
-	    WiFiNetworksFound = scanWifiNetworks(&indices);	
-#endif    
-   
+      configTimeout = 0;  // To allow user input in CP
+
+      WiFiNetworksFound = scanWifiNetworks(&indices);
+#endif
+
       if ( (portal_ssid == "") || portal_pass == "" )
       {
         String randomNum = String(random(0xFFFFFF), HEX);
@@ -1918,28 +2017,25 @@ class WiFiManager_RP2040W_Lite
         portal_ssid = "RP2040W_" + randomNum;
         portal_pass = "MyRP2040W_" + randomNum;
       }
-      
+
       // start access point, AP only, channel 10
-           
+
+      // Can't set channel for CYW43439 now (driver issue)
       uint16_t channel;
-     
-      // Use random channel if  AP_channel == 0     
+
+      // Use random channel if  AP_channel == 0
       if (AP_channel == 0)
         channel = (millis() % MAX_WIFI_CHANNEL) + 1;
       else
         channel = AP_channel;
 
-      WG_LOGERROR3(F("SSID="), portal_ssid, F(",PW="), portal_pass);
-      WG_LOGERROR3(F("IP="), DEFAULT_IP_ADDRESS, F(",CH="), channel);
+      WG_LOGERROR3("SSID=", portal_ssid, ",PW=", portal_pass);
+      //WG_LOGERROR3("IP=", DEFAULT_IP_ADDRESS, ",CH=", channel);
+      WG_LOGERROR1("IP=", DEFAULT_IP_ADDRESS);
 
-#if USE_ESP_AT_SHIELD
-      // start access point, AP only,default channel 10
-      WiFi.beginAP(portal_ssid.c_str(), channel, portal_pass.c_str(), ENC_TYPE_WPA2_PSK, true);
-#else
-      // start access point, AP only,default channel 10
+      // start access point, AP only
+      // RP2040W can't select channel now with arduino-pico core v2.4.0
       WiFi.beginAP(portal_ssid.c_str(), portal_pass.c_str(), channel);
-#endif
-      
 
       if (!server)
       {
@@ -1950,7 +2046,10 @@ class WiFiManager_RP2040W_Lite
 
       if (server)
       {
-        server->on("/", [this](){ handleRequest(); });
+        server->on("/", [this]() 
+        {
+          handleRequest();
+        });
         server->begin();
       }
 
@@ -1959,191 +2058,193 @@ class WiFiManager_RP2040W_Lite
       if (hadConfigData)
       {
         configTimeout = millis() + CONFIG_TIMEOUT;
-                      
-        WG_LOGDEBUG3(F("s:millis() = "), millis(), F(", configTimeout = "), configTimeout);
+
+        WG_LOGDEBUG3("s:millis() = ", millis(), ", configTimeout = ", configTimeout);
       }
       else
       {
         configTimeout = 0;
-               
-        WG_LOGDEBUG(F("s:configTimeout = 0"));    
+
+        WG_LOGDEBUG("s:configTimeout = 0");
       }
 
       configuration_mode = true;
     }
-    
+
 #if SCAN_WIFI_NETWORKS
 
-	  // Source code adapted from https://github.com/khoih-prog/ESP_WiFiManager/blob/master/src/ESP_WiFiManager-Impl.h
+    // Source code adapted from https://github.com/khoih-prog/ESP_WiFiManager/blob/master/src/ESP_WiFiManager-Impl.h
 
     int           _paramsCount            = 0;
     int           _minimumQuality         = -1;
     bool          _removeDuplicateAPs     = true;
-	
-	  //////////////////////////////////////////
-    
+
+    //////////////////////////////////////////
+
     void swap(int *thisOne, int *thatOne)
     {
-       int tempo;
+      int tempo;
 
-       tempo    = *thatOne;
-       *thatOne = *thisOne;
-       *thisOne = tempo;
+      tempo    = *thatOne;
+      *thatOne = *thisOne;
+      *thisOne = tempo;
     }
 
     //////////////////////////////////////////
-	
-	  void setMinimumSignalQuality(const int& quality)
-	  {
-	    _minimumQuality = quality;
-	  }
 
-	  //////////////////////////////////////////
+    void setMinimumSignalQuality(const int& quality)
+    {
+      _minimumQuality = quality;
+    }
 
-	  //if this is true, remove duplicate Access Points - default true
-	  void setRemoveDuplicateAPs(bool removeDuplicates)
-	  {
-	    _removeDuplicateAPs = removeDuplicates;
-	  }
+    //////////////////////////////////////////
 
-	  //////////////////////////////////////////
+    //if this is true, remove duplicate Access Points - default true
+    void setRemoveDuplicateAPs(bool removeDuplicates)
+    {
+      _removeDuplicateAPs = removeDuplicates;
+    }
 
-	  //Scan for WiFiNetworks in range and sort by signal strength
-	  //space for indices array allocated on the heap and should be freed when no longer required  
-	  int scanWifiNetworks(int **indicesptr)
-	  {
-	    WG_LOGDEBUG(F("Scanning Network"));
+    //////////////////////////////////////////
 
-	    int n = WiFi.scanNetworks();
+    //Scan for WiFiNetworks in range and sort by signal strength
+    //space for indices array allocated on the heap and should be freed when no longer required
+    int scanWifiNetworks(int **indicesptr)
+    {
+      WG_LOGDEBUG("Scanning Network");
 
-	    WG_LOGDEBUG1(F("scanWifiNetworks: Done, Scanned Networks n = "), n); 
+      int n = WiFi.scanNetworks();
 
-	    //KH, Terrible bug here. WiFi.scanNetworks() returns n < 0 => malloc( negative == very big ) => crash!!!
-	    //In .../esp32/libraries/WiFi/src/WiFiType.h
-	    //#define WIFI_SCAN_RUNNING   (-1)
-	    //#define WIFI_SCAN_FAILED    (-2)
-	    //if (n == 0)
-	    if (n <= 0)
-	    {
-		    WG_LOGDEBUG(F("No network found"));
-		    return (0);
-	    }
-	    else
-	    {
-		    // Allocate space off the heap for indices array.
-		    // This space should be freed when no longer required.
-		    int* indices = (int *)malloc(n * sizeof(int));
+      WG_LOGDEBUG1("scanWifiNetworks: Done, Scanned Networks n = ", n);
 
-		    if (indices == NULL)
-		    {
-		      WG_LOGDEBUG(F("ERROR: Out of memory"));
-		      *indicesptr = NULL;
-		      return (0);
-		    }
+      //KH, Terrible bug here. WiFi.scanNetworks() returns n < 0 => malloc( negative == very big ) => crash!!!
+      //In .../esp32/libraries/WiFi/src/WiFiType.h
+      //#define WIFI_SCAN_RUNNING   (-1)
+      //#define WIFI_SCAN_FAILED    (-2)
+      //if (n == 0)
+      if (n <= 0)
+      {
+        WG_LOGDEBUG("No network found");
+        return (0);
+      }
+      else
+      {
+        // Allocate space off the heap for indices array.
+        // This space should be freed when no longer required.
+        int* indices = (int *)malloc(n * sizeof(int));
 
-		    *indicesptr = indices;
-	       
-		    //sort networks
-		    for (int i = 0; i < n; i++)
-		    {
-		      indices[i] = i;
-		    }
+        if (indices == NULL)
+        {
+          WG_LOGDEBUG("ERROR: Out of memory");
+          *indicesptr = NULL;
+          return (0);
+        }
 
-		    WG_LOGDEBUG(F("Sorting"));
+        *indicesptr = indices;
 
-		    // RSSI SORT
-		    // old sort
-		    for (int i = 0; i < n; i++)
-		    {
-		      for (int j = i + 1; j < n; j++)
-		      {
-			      if (WiFi.RSSI(indices[j]) > WiFi.RSSI(indices[i]))
-			      {
-                    //std::swap(indices[i], indices[j]);
-                    // Using locally defined swap()
-                    swap(&indices[i], &indices[j]);
-       			}
-		      }
-		    }
+        //sort networks
+        for (int i = 0; i < n; i++)
+        {
+          indices[i] = i;
+        }
 
-		    WG_LOGDEBUG(F("Removing Dup"));
+        WG_LOGDEBUG("Sorting");
 
-		    // remove duplicates ( must be RSSI sorted )
-		    if (_removeDuplicateAPs)
-		    {
-		      String cssid;
-		      
-		      for (int i = 0; i < n; i++)
-		      {
-			      if (indices[i] == -1)
-			        continue;
+        // RSSI SORT
+        // old sort
+        for (int i = 0; i < n; i++)
+        {
+          for (int j = i + 1; j < n; j++)
+          {
+            if (WiFi.RSSI(indices[j]) > WiFi.RSSI(indices[i]))
+            {
+              //std::swap(indices[i], indices[j]);
+              // Using locally defined swap()
+              swap(&indices[i], &indices[j]);
+            }
+          }
+        }
 
-			      cssid = WiFi.SSID(indices[i]);
-			      
-			      for (int j = i + 1; j < n; j++)
-			      {
-			        if (cssid == WiFi.SSID(indices[j]))
-			        {
-				        WG_LOGDEBUG1("DUP AP:", WiFi.SSID(indices[j]));
-				        indices[j] = -1; // set dup aps to index -1
-			        }
-			      }
-		      }
-		    }
+        WG_LOGDEBUG("Removing Dup");
 
-		    for (int i = 0; i < n; i++)
-		    {
-		      if (indices[i] == -1)
-			      continue; // skip dups
+        // remove duplicates ( must be RSSI sorted )
+        if (_removeDuplicateAPs)
+        {
+          String cssid;
 
-		      int quality = getRSSIasQuality(WiFi.RSSI(indices[i]));
+          for (int i = 0; i < n; i++)
+          {
+            if (indices[i] == -1)
+              continue;
 
-		      if (!(_minimumQuality == -1 || _minimumQuality < quality))
-		      {
-			      indices[i] = -1;
-			      WG_LOGDEBUG(F("Skipping low quality"));
-		      }
-		    }
+            cssid = WiFi.SSID(indices[i]);
 
-		    WG_LOGDEBUG(F("WiFi networks found:"));
-		    
-		    for (int i = 0; i < n; i++)
-		    {
-		      if (indices[i] == -1)
-			      continue; // skip dups
-		      else
-			      WG_LOGDEBUG5(i+1,": ",WiFi.SSID(indices[i]), ", ", WiFi.RSSI(i), "dB");
-		    }
+            for (int j = i + 1; j < n; j++)
+            {
+              if (cssid == WiFi.SSID(indices[j]))
+              {
+                WG_LOGDEBUG1("DUP AP:", WiFi.SSID(indices[j]));
+                indices[j] = -1; // set dup aps to index -1
+              }
+            }
+          }
+        }
 
-		    return (n);
-	    }
-	  }
+        for (int i = 0; i < n; i++)
+        {
+          if (indices[i] == -1)
+            continue; // skip dups
 
-	  //////////////////////////////////////////
+          int quality = getRSSIasQuality(WiFi.RSSI(indices[i]));
 
-	  int getRSSIasQuality(const int& RSSI)
-	  {
-	    int quality = 0;
+          if (!(_minimumQuality == -1 || _minimumQuality < quality))
+          {
+            indices[i] = -1;
+            WG_LOGDEBUG("Skipping low quality");
+          }
+        }
 
-	    if (RSSI <= -100)
-	    {
-		    quality = 0;
-	    }
-	    else if (RSSI >= -50)
-	    {
-		    quality = 100;
-	    }
-	    else
-	    {
-		    quality = 2 * (RSSI + 100);
-	    }
+        WG_LOGDEBUG("WiFi networks found:");
 
-	    return quality;
-	  }
+        for (int i = 0; i < n; i++)
+        {
+          if (indices[i] == -1)
+            continue; // skip dups
+          else
+          {
+            WG_LOGDEBUG5(i + 1, ": ", WiFi.SSID(indices[i]), ", ", WiFi.RSSI(i), "dB");
+          }
+        }
 
-  //////////////////////////////////////////
+        return (n);
+      }
+    }
 
-#endif	       
+    //////////////////////////////////////////
+
+    int getRSSIasQuality(const int& RSSI)
+    {
+      int quality = 0;
+
+      if (RSSI <= -100)
+      {
+        quality = 0;
+      }
+      else if (RSSI >= -50)
+      {
+        quality = 100;
+      }
+      else
+      {
+        quality = 2 * (RSSI + 100);
+      }
+
+      return quality;
+    }
+
+    //////////////////////////////////////////
+
+#endif
 };
 
 
