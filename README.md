@@ -751,7 +751,7 @@ This is the terminal output when running [**RP2040W_WiFi**](examples/RP2040W_WiF
 ```
 Start RP2040W_WiFi on RASPBERRY_PI_PICO_W with RP2040W WiFi
 WiFiMulti_Generic v1.2.2
-WiFiManager_RP2040W_Lite v1.0.0
+WiFiManager_RP2040W_Lite v1.6.0
 [WG] Set CustomsStyle to : <style>div,input{padding:5px;font-size:1em;}input{width:95%;}body{text-align: center;}button{background-color:blue;color:white;line-height:2.4rem;font-size:1.2rem;width:100%;}fieldset{border-radius:0.3rem;margin:0px;}</style>
 [WG] Set CustomsHeadElement to : <style>html{filter: invert(10%);}</style>
 [WG] Set CORS Header to : Your Access-Control-Allow-Origin
@@ -845,7 +845,7 @@ h:UpdLittleFS
 ```
 Start RP2040W_WiFi on RASPBERRY_PI_PICO_W with RP2040W WiFi
 WiFiMulti_Generic v1.2.2
-WiFiManager_RP2040W_Lite v1.0.0
+WiFiManager_RP2040W_Lite v1.6.0
 [WG] Set CustomsStyle to : <style>div,input{padding:5px;font-size:1em;}input{width:95%;}body{text-align: center;}button{background-color:blue;color:white;line-height:2.4rem;font-size:1.2rem;width:100%;}fieldset{border-radius:0.3rem;margin:0px;}</style>
 [WG] Set CustomsHeadElement to : <style>html{filter: invert(10%);}</style>
 [WG] Set CORS Header to : Your Access-Control-Allow-Origin
@@ -933,7 +933,7 @@ This is the terminal output when running [**RP2040W_WiFi_MQTT**](examples/RP2040
 ```
 Start RP2040W_WiFi_MQTT on RASPBERRY_PI_PICO_W with RP2040W WiFi
 WiFiMulti_Generic v1.2.2
-WiFiManager_RP2040W_Lite v1.0.0
+WiFiManager_RP2040W_Lite v1.6.0
 [WG] Hostname=RP2040W-MQTT
 LittleFS Flag read = 0xd0d01234
 Flag read = 0xd0d01234
@@ -972,7 +972,7 @@ LED_Control AIO_SUB_TOPIC = private/feeds/LED_Control
 ```
 Start RP2040W_WiFi_MQTT on RASPBERRY_PI_PICO_W with RP2040W WiFi
 WiFiMulti_Generic v1.2.2
-WiFiManager_RP2040W_Lite v1.0.0
+WiFiManager_RP2040W_Lite v1.6.0
 [WG] Hostname=RP2040W-MQTT
 LittleFS Flag read = 0xd0d04321
 Flag read = 0xd0d04321
