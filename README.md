@@ -712,28 +712,28 @@ Please take a look at other examples, as well.
 
 #### 1. File [RP2040W_WiFi.ino](examples/RP2040W_WiFi/RP2040W_WiFi.ino)
 
-https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/572cff450a31e602703f4eeae0b3f3b7a1949dba/examples/RP2040W_WiFi/RP2040W_WiFi.ino#L14-L147
+https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/1ed5de2a5882836f7acf85b264798cd645955563/examples/RP2040W_WiFi/RP2040W_WiFi.ino#L14-L145
 
 
 ---
 
 #### 2. File [defines.h](examples/RP2040W_WiFi/defines.h)
 
-https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/572cff450a31e602703f4eeae0b3f3b7a1949dba/examples/RP2040W_WiFi/defines.h#L13-L133
+https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/1ed5de2a5882836f7acf85b264798cd645955563/examples/RP2040W_WiFi/defines.h#L13-L120
 
 
 ---
 
 #### 3. File [Credentials.h](examples/RP2040W_WiFi/Credentials.h)
 
-https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/572cff450a31e602703f4eeae0b3f3b7a1949dba/examples/RP2040W_WiFi/Credentials.h#L13-L89
+https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/1ed5de2a5882836f7acf85b264798cd645955563/examples/RP2040W_WiFi/Credentials.h#L13-L89
 
 
 ---
 
 #### 4. File [dynamicParams.h](examples/RP2040W_WiFi/dynamicParams.h)
 
-https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/572cff450a31e602703f4eeae0b3f3b7a1949dba/examples/RP2040W_WiFi/dynamicParams.h#L13-L74
+https://github.com/khoih-prog/WiFiManager_RP2040W_Lite/blob/1ed5de2a5882836f7acf85b264798cd645955563/examples/RP2040W_WiFi/dynamicParams.h#L13-L74
 
 
 ---
