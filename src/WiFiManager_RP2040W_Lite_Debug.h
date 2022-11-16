@@ -1,15 +1,15 @@
 /*******************************************************************************************************************************
   WiFiManager_RP2040W_Lite_Debug.h
-  
+
   For RP2040W boards using built-in
 
-  WiFiManager_RP2040W_Lite is a library for the RP2040W boards 
-  (https://github.com/khoih-prog/WiFiManager_RP2040W_Lite) to enable store Credentials in LittleFS for easy 
+  WiFiManager_RP2040W_Lite is a library for the RP2040W boards
+  (https://github.com/khoih-prog/WiFiManager_RP2040W_Lite) to enable store Credentials in LittleFS for easy
   configuration/reconfiguration and autoconnect/autoreconnect of WiFi and other services without Hardcoding.
 
   Built by Khoi Hoang https://github.com/khoih-prog/WiFiManager_RP2040W_Lite
   Licensed under MIT license
-  
+
   Version: 1.6.0
 
   Version Modified By   Date        Comments
@@ -21,9 +21,9 @@
 #define WiFiManager_RP2040W_Lite_Debug_h
 
 #ifdef WIFI_GENERIC_DEBUG_OUTPUT
-  #define DBG_PORT_WG       WIFI_GENERIC_DEBUG_OUTPUT
+	#define DBG_PORT_WG       WIFI_GENERIC_DEBUG_OUTPUT
 #else
-  #define DBG_PORT_WG       Serial
+	#define DBG_PORT_WG       Serial
 #endif
 
 // Change _WIFI_GENERIC_LOGLEVEL_ to set tracing and logging verbosity
@@ -34,7 +34,7 @@
 // 4: DEBUG: errors, warnings, informational and debug
 
 #ifndef _WIFI_GENERIC_LOGLEVEL_
-  #define _WIFI_GENERIC_LOGLEVEL_       0
+	#define _WIFI_GENERIC_LOGLEVEL_       0
 #endif
 
 const char WG_MARK[] = "[WG] ";
